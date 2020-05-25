@@ -10,7 +10,7 @@
 (defn read-message [stream message]
   (match message
     [:ping pong]
-    (irc/pong stream pong)))
+    (irc/write-pong stream pong)))
 
 (irc/connect
   {:host "irc.example.com"
