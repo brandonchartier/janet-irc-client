@@ -84,6 +84,13 @@
                                nickname
                                message)))
 
+(defn write-msg
+  "Convenience function for writing a PRIVMSG directly to a channel"
+  [stream channel message]
+  (write stream (string/format "PRIVMSG %s :%s"
+                               channel
+                               message)))
+
 (defn write-user
   "Specifies the various names of the client.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#USER"
