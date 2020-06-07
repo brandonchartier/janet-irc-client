@@ -1,6 +1,7 @@
 (import queue)
 
 (def- message-grammar
+  "Grammar for parsing IRC messages."
   (peg/compile
     ~{:crlf (* "\r" "\n")
       :tags (* (constant :tags)
@@ -85,7 +86,7 @@
                                message)))
 
 (defn write-msg
-  "Convenience function for writing a PRIVMSG directly to a channel"
+  "Convenience function for writing a PRIVMSG directly to a channel."
   [stream channel message]
   (write stream (string/format "PRIVMSG %s :%s"
                                channel
