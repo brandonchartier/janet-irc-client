@@ -1,5 +1,3 @@
-(import queue)
-
 (def- message-grammar
   "Grammar for parsing IRC messages."
   (peg/compile
@@ -56,14 +54,14 @@
     (if (nil? idx)
       val
       (let [[head tail] (split-after val idx pat)]
-        (queue/enqueue queue head)
+        (array/insert queue 0 head)
         (split-and-add queue tail)))))
 
 (defn- read-until-end
   "Recursively reads a queue until empty,
    processing each item with a transform function."
   [queue f]
-  (when-let [item (queue/dequeue queue)]
+  (when-let [item (array/pop queue)]
     (f item)
     (read-until-end queue f)))
 
@@ -73,7 +71,7 @@
   [stream message]
   (let [line (string message "\r\n")]
     (net/write stream line)
-    (os/sleep 0.5)))
+    (ev/sleep 0.5)))
 
 (defn write-priv
   "Sends a message to a channel,
@@ -130,7 +128,7 @@
 (defn- read
   [stream callback &opt acc]
   (when-let [message (net/read stream 1024)
-             message-queue (queue/new)
+             message-queue @[]
              chunk (split-and-add message-queue message acc)]
     (read-until-end
       message-queue
