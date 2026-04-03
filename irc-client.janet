@@ -1,3 +1,5 @@
+(import queue)
+
 (def message-grammar
   "Grammar for parsing IRC messages.
    https://datatracker.ietf.org/doc/html/rfc2812#section-2.3.1"
@@ -43,7 +45,7 @@
 (defn- split-and-add
   "Splits bytes on newlines and adds them to a queue,
    returning any leftover bytes."
-  [queue bytes &opt acc]
+  [q bytes &opt acc]
   (default acc "")
   (let [pat "\r\n"
         val (string acc bytes)
@@ -51,16 +53,16 @@
     (if (nil? idx)
       val
       (let [[head tail] (split-after val idx pat)]
-        (array/insert queue 0 head)
-        (split-and-add queue tail)))))
+        (queue/enqueue q head)
+        (split-and-add q tail)))))
 
 (defn- read-until-end
   "Recursively reads a queue until empty,
    processing each item with a transform function."
-  [queue f]
-  (when-let [item (array/pop queue)]
-    (f item)
-    (read-until-end queue f)))
+  [q f]
+  (when (not (queue/empty? q))
+    (f (queue/dequeue q))
+    (read-until-end q f)))
 
 (defn- write
   "Writes a message to a stream, with a newline suffix,
@@ -146,7 +148,7 @@
 (defn- read
   [stream callback &opt acc]
   (when-let [message (net/read stream 1024)
-             message-queue @[]
+             message-queue (queue/new)
              chunk (split-and-add message-queue message acc)]
     (read-until-end
       message-queue
