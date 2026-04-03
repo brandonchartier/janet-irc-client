@@ -19,7 +19,8 @@
                     (* (constant :prefix)
                        (<- (some :S)))))
       :command (* (constant :command)
-                  (<- (some (+ :a :d))))
+                  (+ (/ (<- (between 3 3 :d)) ,scan-number)
+                     (<- (some :a))))
       :trailing (* ":" (<- (any (if-not :crlf 1))))
       :middle (<- (* :nospcrlfcl (any (+ ":" :nospcrlfcl))))
       :params (* (constant :params)
@@ -114,12 +115,33 @@
 
 (defn message-format
   [message]
-  (match (peg/match message-grammar message)
-    [:command "PING" :params [trailing]]
-    [:ping trailing]
-    [:from from :user user :host host :command "PRIVMSG" :params [to trailing]]
-    [:priv (string user "@" host) from to trailing]
-    _ [:unparsed message]))
+  (if-let [r (peg/match message-grammar message)]
+    (let [info (table ;r)
+          nick (or (info :from) (info :prefix))
+          prefix (if (info :user)
+                   (string (info :user) "@" (info :host))
+                   nick)
+          params (or (info :params) @[])
+          cmd (info :command)]
+      (match [cmd ;params]
+        ["PING" trailing]              [:ping trailing]
+        ["ERROR" trailing]             [:error trailing]
+        ["PRIVMSG" to trailing]        [:priv prefix nick to trailing]
+        ["NOTICE" to trailing]         [:notice prefix nick to trailing]
+        ["JOIN" channel]               [:join prefix nick channel]
+        ["PART" channel reason]        [:part prefix nick channel reason]
+        ["PART" channel]               [:part prefix nick channel nil]
+        ["QUIT" reason]                [:quit prefix nick reason]
+        ["QUIT"]                       [:quit prefix nick nil]
+        ["KICK" ch target reason]      [:kick prefix nick ch target reason]
+        ["KICK" ch target]             [:kick prefix nick ch target nil]
+        ["NICK" newnick]               [:nick prefix nick newnick]
+        ["MODE" & rest]                [:mode prefix nick ;rest]
+        ["TOPIC" channel topic]        [:topic prefix nick channel topic]
+        ["INVITE" target channel]      [:invite prefix nick target channel]
+        [(num (number? num)) & rest]   [:numeric nick num ;rest]
+        _                              [:unparsed message]))
+    [:unparsed message]))
 
 (defn- read
   [stream callback &opt acc]

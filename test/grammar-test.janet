@@ -29,13 +29,13 @@
 # Server numeric reply (001 welcome)
 (assert (deep= (parse ":server.example.com 001 mynick :Welcome to IRC\r\n")
                @[:prefix "server.example.com"
-                 :command "001" :params @["mynick" "Welcome to IRC"]])
+                 :command 1 :params @["mynick" "Welcome to IRC"]])
         "numeric 001 welcome")
 
 # NAMES reply (353)
 (assert (deep= (parse ":server 353 nick = #channel :user1 user2 user3\r\n")
                @[:prefix "server"
-                 :command "353" :params @["nick" "=" "#channel" "user1 user2 user3"]])
+                 :command 353 :params @["nick" "=" "#channel" "user1 user2 user3"]])
         "numeric 353 NAMES reply")
 
 # JOIN with channel
@@ -133,12 +133,108 @@
                [:priv "user@host" "nick" "#channel" "hello world"])
         "format PRIVMSG")
 
-(assert (deep= (format ":nick!user@host JOIN #channel\r\n")
-               [:unparsed ":nick!user@host JOIN #channel\r\n"])
-        "format JOIN falls to unparsed")
+# ----------------------------------------------------------------
+# message-format tests — ERROR
+# ----------------------------------------------------------------
 
-(assert (deep= (format ":server 001 nick :Welcome\r\n")
-               [:unparsed ":server 001 nick :Welcome\r\n"])
-        "format numeric falls to unparsed")
+(assert (deep= (format "ERROR :Closing Link: reason\r\n")
+               [:error "Closing Link: reason"])
+        "format ERROR")
+
+# ----------------------------------------------------------------
+# message-format tests — NOTICE
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":nick!user@host NOTICE #channel :hello\r\n")
+               [:notice "user@host" "nick" "#channel" "hello"])
+        "format NOTICE from user")
+
+(assert (deep= (format ":server.example.com NOTICE * :*** Looking up your hostname\r\n")
+               [:notice "server.example.com" "server.example.com" "*" "*** Looking up your hostname"])
+        "format NOTICE from server")
+
+# ----------------------------------------------------------------
+# message-format tests — JOIN / PART / QUIT
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":nick!user@host JOIN #channel\r\n")
+               [:join "user@host" "nick" "#channel"])
+        "format JOIN")
+
+(assert (deep= (format ":nick!user@host JOIN :#channel\r\n")
+               [:join "user@host" "nick" "#channel"])
+        "format JOIN with trailing colon")
+
+(assert (deep= (format ":nick!user@host PART #channel\r\n")
+               [:part "user@host" "nick" "#channel" nil])
+        "format PART without reason")
+
+(assert (deep= (format ":nick!user@host PART #channel :Goodbye\r\n")
+               [:part "user@host" "nick" "#channel" "Goodbye"])
+        "format PART with reason")
+
+(assert (deep= (format ":nick!user@host QUIT :Leaving\r\n")
+               [:quit "user@host" "nick" "Leaving"])
+        "format QUIT with reason")
+
+(assert (deep= (format ":nick!user@host QUIT\r\n")
+               [:quit "user@host" "nick" nil])
+        "format QUIT without reason")
+
+# ----------------------------------------------------------------
+# message-format tests — KICK
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":op!user@host KICK #channel baduser :Behave\r\n")
+               [:kick "user@host" "op" "#channel" "baduser" "Behave"])
+        "format KICK with reason")
+
+(assert (deep= (format ":op!user@host KICK #channel baduser\r\n")
+               [:kick "user@host" "op" "#channel" "baduser" nil])
+        "format KICK without reason")
+
+# ----------------------------------------------------------------
+# message-format tests — NICK / MODE
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":oldnick!user@host NICK newnick\r\n")
+               [:nick "user@host" "oldnick" "newnick"])
+        "format NICK change")
+
+(assert (deep= (format ":nick!user@host MODE #channel +o othernick\r\n")
+               [:mode "user@host" "nick" "#channel" "+o" "othernick"])
+        "format MODE from user")
+
+(assert (deep= (format ":server MODE #channel +nt\r\n")
+               [:mode "server" "server" "#channel" "+nt"])
+        "format MODE from server")
+
+# ----------------------------------------------------------------
+# message-format tests — TOPIC / INVITE
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":nick!user@host TOPIC #channel :New topic\r\n")
+               [:topic "user@host" "nick" "#channel" "New topic"])
+        "format TOPIC")
+
+(assert (deep= (format ":nick!user@host INVITE target #channel\r\n")
+               [:invite "user@host" "nick" "target" "#channel"])
+        "format INVITE")
+
+# ----------------------------------------------------------------
+# message-format tests — server numerics
+# ----------------------------------------------------------------
+
+(assert (deep= (format ":server 001 nick :Welcome to IRC\r\n")
+               [:numeric "server" 1 "nick" "Welcome to IRC"])
+        "format numeric 001")
+
+(assert (deep= (format ":server 353 nick = #channel :user1 user2\r\n")
+               [:numeric "server" 353 "nick" "=" "#channel" "user1 user2"])
+        "format numeric 353 NAMES")
+
+(assert (deep= (format ":server 366 nick #channel :End of /NAMES list\r\n")
+               [:numeric "server" 366 "nick" "#channel" "End of /NAMES list"])
+        "format numeric 366")
 
 (print "All tests passed.")
