@@ -9,8 +9,12 @@
 
 (defn read-message [stream message]
   (match message
-    [:ping pong]
-    (irc/write-pong stream pong)))
+    [:ping pong]           (irc/write-pong stream pong)
+    [:priv _ from to msg]  (print from " in " to ": " msg)
+    [:join _ nick channel] (print nick " joined " channel)
+    [:quit _ nick reason]  (print nick " quit: " reason)
+    [:notice _ _ _ msg]    (print "notice: " msg)
+    [:numeric _ code & rest] (printf "numeric %d: %s" code (string/join rest " "))))
 
 (irc/connect
   {:host "irc.example.com"
