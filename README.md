@@ -1,10 +1,12 @@
 # Janet IRC Client
 
+An IRC client library for Janet.
+
 `jpm install https://github.com/brandonchartier/janet-irc-client`
 
 ---
 
-```
+```janet
 (import irc-client :as irc)
 
 (defn read-message [stream message]
@@ -25,3 +27,7 @@
    :realname "my_realname"}
   read-message)
 ```
+
+## License
+
+GPL-3.0
