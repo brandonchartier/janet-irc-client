@@ -1,37 +1,33 @@
-(def- message-grammar
-  "Grammar for parsing IRC messages."
+(def message-grammar
+  "Grammar for parsing IRC messages.
+   https://datatracker.ietf.org/doc/html/rfc2812#section-2.3.1"
   (peg/compile
     ~{:crlf (* "\r" "\n")
+      :nospcrlfcl (if-not (set "\0\r\n :") 1)
       :tags (* (constant :tags)
                "@"
                (<- (some :S)))
-      :prefix (* (constant :prefix)
-                 (<- (some :S)))
-      :from (* (constant :from)
-               (<- (any (if-not "!" 1)))
-               "!"
-               :prefix)
       :source (* ":"
-                 (+ :from :prefix))
+                 (+ (* (constant :from)
+                       (<- (some (if-not (set "!@ \r\n") 1)))
+                       "!"
+                       (constant :user)
+                       (<- (some (if-not (set "@ \r\n") 1)))
+                       "@"
+                       (constant :host)
+                       (<- (some :S)))
+                    (* (constant :prefix)
+                       (<- (some :S)))))
       :command (* (constant :command)
-                  (<- (some :w)))
-      :trailing (* (constant :trailing)
-                   ":"
-                   (<- (any (if-not :crlf 1))))
-      :to (* (constant :to)
-             (<- (any :S))
-             (any :s)
-             :trailing)
-      :params (+ :to :trailing)
-      :middle (* (constant :middle)
-                 (<- (some (+ :w " ")))
-                 (constant :placeholder)
-                 (<- (any (if-not :crlf 1))))
+                  (<- (some (+ :a :d))))
+      :trailing (* ":" (<- (any (if-not :crlf 1))))
+      :middle (<- (* :nospcrlfcl (any (+ ":" :nospcrlfcl))))
+      :params (* (constant :params)
+                 (group (any (* " " (+ :trailing :middle)))))
       :main (* (any (* :tags (some " ")))
                (any (* :source (some " ")))
                :command
-               (any " ")
-               (any (+ :params :middle))
+               (? :params)
                :crlf)}))
 
 (defn- split-after
@@ -116,13 +112,13 @@
   [stream message]
   (write stream (string/format "PONG %s" message)))
 
-(defn- message-format
+(defn message-format
   [message]
   (match (peg/match message-grammar message)
-    [:command "PING" :trailing trailing]
+    [:command "PING" :params [trailing]]
     [:ping trailing]
-    [:from from :prefix prefix :command "PRIVMSG" :to to :trailing trailing]
-    [:priv prefix from to trailing]
+    [:from from :user user :host host :command "PRIVMSG" :params [to trailing]]
+    [:priv (string user "@" host) from to trailing]
     _ [:unparsed message]))
 
 (defn- read
