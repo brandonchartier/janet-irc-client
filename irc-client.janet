@@ -168,6 +168,7 @@
     (write-nick stream nickname)
     (read stream
       (fn [stream message]
-        (when (match message [:numeric _ 1] true)
-          (each channel channels (write-join stream channel)))
+        (match message
+          [:ping pong] (write-pong stream pong)
+          [:numeric _ 1] (each channel channels (write-join stream channel)))
         (callback stream message)))))
