@@ -166,5 +166,8 @@
   (with [stream (net/connect host port)]
     (write-user stream username realname)
     (write-nick stream nickname)
-    (each channel channels (write-join stream channel))
-    (read stream callback)))
+    (read stream
+      (fn [stream message]
+        (when (match message [:numeric _ 1] true)
+          (each channel channels (write-join stream channel)))
+        (callback stream message)))))
