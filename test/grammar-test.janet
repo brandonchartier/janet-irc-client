@@ -133,6 +133,10 @@
                [:priv "user@host" "nick" "#channel" "hello world"])
         "format PRIVMSG")
 
+(assert (deep= (format (string ":nick!user@host PRIVMSG jobot :\x01VERSION\x01\r\n"))
+               [:ctcp "user@host" "nick" "jobot" "\x01VERSION\x01"])
+        "format CTCP VERSION")
+
 # ----------------------------------------------------------------
 # message-format tests — ERROR
 # ----------------------------------------------------------------

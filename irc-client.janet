@@ -128,7 +128,9 @@
       (match [cmd ;params]
         ["PING" trailing] [:ping trailing]
         ["ERROR" trailing] [:error trailing]
-        ["PRIVMSG" to trailing] [:priv prefix nick to trailing]
+        ["PRIVMSG" to trailing] (if (= (get trailing 0) 1)
+                                  [:ctcp prefix nick to trailing]
+                                  [:priv prefix nick to trailing])
         ["NOTICE" to trailing] [:notice prefix nick to trailing]
         ["JOIN" channel] [:join prefix nick channel]
         ["PART" channel reason] [:part prefix nick channel reason]
