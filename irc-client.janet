@@ -115,6 +115,13 @@
   [stream message]
   (write stream (string/format "PONG %s" message)))
 
+(def- ctcp-peg
+  (peg/compile
+    ~{:delim "\x01"
+      :cmd (<- (some (if-not (+ " " :delim) 1)))
+      :arg (* " " (<- (any (if-not :delim 1))))
+      :main (* :delim :cmd (? :arg) :delim)}))
+
 (defn message-format
   [message]
   (if-let [r (peg/match message-grammar message)]
@@ -128,9 +135,11 @@
       (match [cmd ;params]
         ["PING" trailing] [:ping trailing]
         ["ERROR" trailing] [:error trailing]
-        ["PRIVMSG" to trailing] (if (= (get trailing 0) 1)
-                                  [:ctcp prefix nick to trailing]
-                                  [:priv prefix nick to trailing])
+        ["PRIVMSG" to trailing] (if (not= (get trailing 0) 1)
+                                  [:priv prefix nick to trailing]
+                                  (match (peg/match ctcp-peg trailing)
+                                    ["ACTION" text] [:action prefix nick to text]
+                                    _ [:ctcp prefix nick to trailing]))
         ["NOTICE" to trailing] [:notice prefix nick to trailing]
         ["JOIN" channel] [:join prefix nick channel]
         ["PART" channel reason] [:part prefix nick channel reason]
@@ -169,8 +178,8 @@
     (write-user stream username realname)
     (write-nick stream nickname)
     (read stream
-      (fn [stream message]
-        (match message
-          [:ping pong] (write-pong stream pong)
-          [:numeric _ 1] (each channel channels (write-join stream channel)))
-        (callback stream message)))))
+          (fn [stream message]
+            (match message
+              [:ping pong] (write-pong stream pong)
+              [:numeric _ 1] (each channel channels (write-join stream channel)))
+            (callback stream message)))))

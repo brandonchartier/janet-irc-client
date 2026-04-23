@@ -137,6 +137,10 @@
                [:ctcp "user@host" "nick" "jobot" "\x01VERSION\x01"])
         "format CTCP VERSION")
 
+(assert (deep= (format (string ":nick!user@host PRIVMSG #channel :\x01ACTION waves\x01\r\n"))
+               [:action "user@host" "nick" "#channel" "waves"])
+        "format CTCP ACTION")
+
 # ----------------------------------------------------------------
 # message-format tests — ERROR
 # ----------------------------------------------------------------
