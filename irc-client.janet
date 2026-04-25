@@ -174,6 +174,12 @@
       (comp callback message-format))
     (read stream callback chunk)))
 
+(defn- route-message [writer channels callback message]
+  (match message
+    [:ping pong] (write-pong writer pong)
+    [:numeric _ 1] (each channel channels (write-join writer channel)))
+  (callback writer message))
+
 (defn connect
   [{:host host
     :port port
@@ -188,10 +194,4 @@
       (ev/go (fn [] (writer-loop stream writer)))
       (write-user writer username realname)
       (write-nick writer nickname)
-      (read stream
-            (fn [message]
-              (match message
-                [:ping pong] (write-pong writer pong)
-                [:numeric _ 1] (each channel channels (write-join writer channel)))
-              (callback writer message))))))
-
+      (read stream (partial route-message writer channels callback)))))
