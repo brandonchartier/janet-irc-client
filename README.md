@@ -9,9 +9,8 @@ An IRC client library for Janet.
 ```janet
 (import irc-client :as irc)
 
-(defn read-message [stream message]
+(defn read-message [writer message]
   (match message
-    [:ping pong]           (irc/write-pong stream pong)
     [:priv _ from to msg]  (print from " in " to ": " msg)
     [:join _ nick channel] (print nick " joined " channel)
     [:quit _ nick reason]  (print nick " quit: " reason)

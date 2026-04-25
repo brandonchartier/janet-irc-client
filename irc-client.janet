@@ -64,56 +64,64 @@
     (f (queue/dequeue q))
     (read-until-end q f)))
 
-(defn- write
-  "Writes a message to a stream, with a newline suffix,
-   and sleeps for :delay seconds to avoid flooding."
-  [stream message]
-  (let [line (string message "\r\n")]
-    (net/write stream line)
+(defn- enqueue
+  "Appends CRLF to a message and gives it to the writer."
+  [writer message]
+  (ev/give writer (string message "\r\n")))
+
+(defn- writer-loop
+  "Consumes messages from the writer, sending each to the stream with a
+   0.5s delay between writes to avoid flooding. Exits when the writer
+   is closed."
+  [stream writer]
+  (while true
+    (def msg (ev/take writer))
+    (when (nil? msg) (break))
+    (net/write stream msg)
     (ev/sleep 0.5)))
 
 (defn write-priv
   "Sends a message to a channel,
    responding to the user who sent the command.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#PRIVMSG"
-  [stream channel nickname message]
-  (write stream (string/format "PRIVMSG %s :%s: %s"
-                               channel
-                               nickname
-                               message)))
+  [writer channel nickname message]
+  (enqueue writer (string/format "PRIVMSG %s :%s: %s"
+                                 channel
+                                 nickname
+                                 message)))
 
 (defn write-msg
   "Convenience function for writing a PRIVMSG directly to a channel."
-  [stream channel message]
-  (write stream (string/format "PRIVMSG %s :%s"
-                               channel
-                               message)))
+  [writer channel message]
+  (enqueue writer (string/format "PRIVMSG %s :%s"
+                                 channel
+                                 message)))
 
 (defn write-user
   "Specifies the various names of the client.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#USER"
-  [stream username realname]
-  (write stream (string/format "USER %s 0 * :%s"
-                               username
-                               realname)))
+  [writer username realname]
+  (enqueue writer (string/format "USER %s 0 * :%s"
+                                 username
+                                 realname)))
 
 (defn write-nick
   "Changes the client's nickname.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#NICK"
-  [stream nickname]
-  (write stream (string/format "NICK %s" nickname)))
+  [writer nickname]
+  (enqueue writer (string/format "NICK %s" nickname)))
 
 (defn write-join
   "Joins an IRC channel.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#JOIN"
-  [stream channel]
-  (write stream (string/format "JOIN %s" channel)))
+  [writer channel]
+  (enqueue writer (string/format "JOIN %s" channel)))
 
 (defn write-pong
   "Sends a PONG reply to the server to avoid disconnecting.
    https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#PONG"
-  [stream message]
-  (write stream (string/format "PONG %s" message)))
+  [writer message]
+  (enqueue writer (string/format "PONG %s" message)))
 
 (def- ctcp-peg
   (peg/compile
@@ -163,7 +171,7 @@
              chunk (split-and-add message-queue message acc)]
     (read-until-end
       message-queue
-      (comp (partial callback stream) message-format))
+      (comp callback message-format))
     (read stream callback chunk)))
 
 (defn connect
@@ -175,11 +183,14 @@
     :realname realname}
    callback]
   (with [stream (net/connect host port)]
-    (write-user stream username realname)
-    (write-nick stream nickname)
+    (def writer (ev/chan 16))
+    (defer (ev/chan-close writer))
+    (ev/go (fn [] (writer-loop stream writer)))
+    (write-user writer username realname)
+    (write-nick writer nickname)
     (read stream
-          (fn [stream message]
+          (fn [message]
             (match message
-              [:ping pong] (write-pong stream pong)
-              [:numeric _ 1] (each channel channels (write-join stream channel)))
-            (callback stream message)))))
+              [:ping pong] (write-pong writer pong)
+              [:numeric _ 1] (each channel channels (write-join writer channel)))
+            (callback writer message)))))
