@@ -184,13 +184,13 @@
    callback]
   (with [stream (net/connect host port)]
     (def writer (ev/chan 16))
-    (defer (ev/chan-close writer))
-    (ev/go (fn [] (writer-loop stream writer)))
-    (write-user writer username realname)
-    (write-nick writer nickname)
-    (read stream
-          (fn [message]
-            (match message
-              [:ping pong] (write-pong writer pong)
-              [:numeric _ 1] (each channel channels (write-join writer channel)))
-            (callback writer message)))))
+    (defer (ev/chan-close writer)
+      (ev/go (fn [] (writer-loop stream writer)))
+      (write-user writer username realname)
+      (write-nick writer nickname)
+      (read stream
+            (fn [message]
+              (match message
+                [:ping pong] (write-pong writer pong)
+                [:numeric _ 1] (each channel channels (write-join writer channel)))
+              (callback writer message)))))
