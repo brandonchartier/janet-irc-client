@@ -193,4 +193,5 @@
               (match message
                 [:ping pong] (write-pong writer pong)
                 [:numeric _ 1] (each channel channels (write-join writer channel)))
-              (callback writer message)))))
+              (callback writer message))))))
+
